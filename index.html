@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>나의 일정 관리</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="app-header">
+      <h1>나의 일정 관리</h1>
+      <div class="lock-panel">
+        <label for="password-input">편집 비밀번호</label>
+        <div class="lock-controls">
+          <input id="password-input" type="password" placeholder="비밀번호 입력" />
+          <button id="unlock-btn">잠금 해제</button>
+          <button id="lock-btn" class="secondary">잠그기</button>
+        </div>
+        <p id="lock-status" class="lock-status lock-status--locked">현재 상태: 잠김</p>
+      </div>
+    </header>
+
+    <main class="app-main">
+      <section class="todo-form-section">
+        <h2>새 할 일 추가</h2>
+        <form id="todo-form">
+          <div class="form-row">
+            <label for="title-input">할 일</label>
+            <input id="title-input" type="text" placeholder="무엇을 할까요?" required />
+          </div>
+          <div class="form-row">
+            <label for="deadline-input">마감일</label>
+            <input id="deadline-input" type="date" required />
+          </div>
+          <div class="form-row">
+            <label for="priority-input">우선순위 (1이 가장 중요)</label>
+            <input id="priority-input" type="number" min="1" max="5" value="3" required />
+          </div>
+          <div class="form-actions">
+            <button type="submit" id="add-btn">추가</button>
+            <button type="button" id="reset-form-btn" class="secondary">입력 초기화</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="toolbar-section">
+        <div class="toolbar-left">
+          <button type="button" id="export-json-btn" class="secondary">JSON 내보내기</button>
+        </div>
+        <div class="toolbar-right">
+          <label for="filter-select">보기</label>
+          <select id="filter-select">
+            <option value="all">전체</option>
+            <option value="today">오늘</option>
+            <option value="pending">미완료만</option>
+            <option value="done">완료만</option>
+          </select>
+        </div>
+      </section>
+
+      <section class="todo-list-section">
+        <h2>할 일 목록</h2>
+        <div id="todo-list-empty" class="empty-message">
+          아직 등록된 할 일이 없습니다. 위에서 새로운 할 일을 추가해 보세요.
+        </div>
+        <div id="todo-list" class="todo-list"></div>
+      </section>
+    </main>
+
+    <footer class="app-footer">
+      <p>데이터는 브라우저와 GitHub 리포지토리에 저장됩니다.</p>
+      <p class="hint">
+        편집 전에는 항상 <code>git pull</code>, 편집 후에는 <code>git commit</code>과 <code>git push</code>를 해 주세요.
+      </p>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
+
