@@ -22,6 +22,7 @@ const elements = {
   todoList: document.getElementById("todo-list"),
   todoListEmpty: document.getElementById("todo-list-empty"),
   exportJsonBtn: document.getElementById("export-json-btn"),
+  resetStorageBtn: document.getElementById("reset-storage-btn"),
 };
 
 let editingId = null;
@@ -386,6 +387,23 @@ function handleExportJson() {
   alert("다운로드된 todos.json 내용을 리포지토리의 data/todos.json 에 덮어쓴 뒤 커밋/푸시하면 됩니다.");
 }
 
+function handleResetStorage() {
+  const ok = confirm(
+    "이 브라우저에 저장된 일정 데이터(localStorage)와 잠금 상태를 모두 초기화합니다.\nGitHub에 있는 data/todos.json 파일은 그대로 유지됩니다.\n계속하시겠습니까?"
+  );
+  if (!ok) return;
+
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(UNLOCK_KEY);
+  } catch (e) {
+    console.warn("localStorage 초기화 실패", e);
+  }
+
+  alert("브라우저 저장 데이터가 초기화되었습니다.\n페이지를 다시 불러와 GitHub의 data/todos.json 기준으로 새로 표시합니다.");
+  window.location.reload();
+}
+
 async function init() {
   initLockState();
   loadFromLocalStorage();
@@ -404,6 +422,9 @@ async function init() {
   elements.lockBtn.addEventListener("click", handleLock);
   elements.filterSelect.addEventListener("change", renderTodos);
   elements.exportJsonBtn.addEventListener("click", handleExportJson);
+  if (elements.resetStorageBtn) {
+    elements.resetStorageBtn.addEventListener("click", handleResetStorage);
+  }
 }
 
 document.addEventListener("DOMContentLoaded", init);
