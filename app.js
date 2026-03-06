@@ -5,6 +5,8 @@ const UNLOCK_KEY = "myschedule_unlocked_v1";
 
 let todos = [];
 let isUnlocked = false;
+let currentCalendarYear;
+let currentCalendarMonth;
 
 const elements = {
   passwordInput: document.getElementById("password-input"),
@@ -23,6 +25,11 @@ const elements = {
   todoListEmpty: document.getElementById("todo-list-empty"),
   exportJsonBtn: document.getElementById("export-json-btn"),
   resetStorageBtn: document.getElementById("reset-storage-btn"),
+  calendarSection: document.getElementById("calendar-section"),
+  calendarMonthLabel: document.getElementById("calendar-month-label"),
+  calendarGrid: document.getElementById("calendar-grid"),
+  calendarPrevBtn: document.getElementById("calendar-prev-btn"),
+  calendarNextBtn: document.getElementById("calendar-next-btn"),
 };
 
 let editingId = null;
@@ -73,6 +80,12 @@ function isDueSoon(deadline) {
   const today = new Date(getTodayString());
   const diffDays = (date - today) / (1000 * 60 * 60 * 24);
   return diffDays >= 0 && diffDays <= 2;
+}
+
+function formatYmd(year, monthIndex, day) {
+  const mm = String(monthIndex + 1).padStart(2, "0");
+  const dd = String(day).padStart(2, "0");
+  return `${year}-${mm}-${dd}`;
 }
 
 function saveToLocalStorage() {
@@ -131,6 +144,10 @@ function updateLockUI() {
   actionButtons.forEach((btn) => {
     btn.disabled = disabled;
   });
+
+   if (elements.resetStorageBtn) {
+     elements.resetStorageBtn.disabled = disabled;
+   }
 }
 
 function renderTodos() {
@@ -158,6 +175,7 @@ function renderTodos() {
 
   if (filtered.length === 0) {
     elements.todoListEmpty.style.display = "block";
+    renderCalendar();
     return;
   }
 
@@ -272,6 +290,98 @@ function renderTodos() {
   });
 
   updateLockUI();
+  renderCalendar();
+}
+
+function renderCalendar() {
+  if (!elements.calendarGrid || !elements.calendarMonthLabel) return;
+
+  if (typeof currentCalendarYear !== "number" || typeof currentCalendarMonth !== "number") {
+    const today = new Date();
+    currentCalendarYear = today.getFullYear();
+    currentCalendarMonth = today.getMonth();
+  }
+
+  const year = currentCalendarYear;
+  const month = currentCalendarMonth;
+
+  elements.calendarMonthLabel.textContent = `${year}년 ${month + 1}월`;
+
+  const firstDay = new Date(year, month, 1);
+  const firstWeekday = firstDay.getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const daysInPrevMonth = new Date(year, month, 0).getDate();
+
+  elements.calendarGrid.innerHTML = "";
+  const todayStr = getTodayString();
+
+  for (let i = 0; i < 42; i += 1) {
+    const cell = document.createElement("div");
+    cell.className = "calendar-cell";
+
+    let displayDay;
+    let cellYear = year;
+    let cellMonth = month;
+    let inCurrentMonth = true;
+
+    if (i < firstWeekday) {
+      inCurrentMonth = false;
+      displayDay = daysInPrevMonth - (firstWeekday - 1 - i);
+      if (month === 0) {
+        cellYear = year - 1;
+        cellMonth = 11;
+      } else {
+        cellMonth = month - 1;
+      }
+    } else if (i >= firstWeekday + daysInMonth) {
+      inCurrentMonth = false;
+      displayDay = i - (firstWeekday + daysInMonth) + 1;
+      if (month === 11) {
+        cellYear = year + 1;
+        cellMonth = 0;
+      } else {
+        cellMonth = month + 1;
+      }
+    } else {
+      displayDay = i - firstWeekday + 1;
+    }
+
+    const dateStr = formatYmd(cellYear, cellMonth, displayDay);
+
+    if (!inCurrentMonth) {
+      cell.classList.add("calendar-cell--other-month");
+    }
+    if (dateStr === todayStr) {
+      cell.classList.add("calendar-cell--today");
+    }
+
+    const dateLabel = document.createElement("div");
+    dateLabel.className = "calendar-date-label";
+    dateLabel.textContent = displayDay;
+
+    const todosContainer = document.createElement("div");
+    todosContainer.className = "calendar-todos";
+
+    const dayTodos = todos.filter((t) => t.deadline === dateStr);
+    if (dayTodos.length > 0) {
+      cell.classList.add("calendar-cell--has-todo");
+    }
+
+    dayTodos.forEach((todo) => {
+      const pill = document.createElement("div");
+      pill.className = "calendar-todo-pill";
+      const fullTitle = todo.title || "";
+      const maxLen = 10;
+      const shortTitle = fullTitle.length > maxLen ? `${fullTitle.slice(0, maxLen)}…` : fullTitle;
+      pill.textContent = shortTitle;
+      pill.title = fullTitle;
+      todosContainer.appendChild(pill);
+    });
+
+    cell.appendChild(dateLabel);
+    cell.appendChild(todosContainer);
+    elements.calendarGrid.appendChild(cell);
+  }
 }
 
 function resetForm() {
@@ -388,6 +498,7 @@ function handleExportJson() {
 }
 
 function handleResetStorage() {
+  if (!isUnlocked) return;
   const ok = confirm(
     "이 브라우저에 저장된 일정 데이터(localStorage)와 잠금 상태를 모두 초기화합니다.\nGitHub에 있는 data/todos.json 파일은 그대로 유지됩니다.\n계속하시겠습니까?"
   );
@@ -406,6 +517,10 @@ function handleResetStorage() {
 
 async function init() {
   initLockState();
+  const today = new Date();
+  currentCalendarYear = today.getFullYear();
+  currentCalendarMonth = today.getMonth();
+
   loadFromLocalStorage();
   if (todos.length === 0) {
     await loadFromFile();
@@ -424,6 +539,26 @@ async function init() {
   elements.exportJsonBtn.addEventListener("click", handleExportJson);
   if (elements.resetStorageBtn) {
     elements.resetStorageBtn.addEventListener("click", handleResetStorage);
+  }
+  if (elements.calendarPrevBtn && elements.calendarNextBtn) {
+    elements.calendarPrevBtn.addEventListener("click", () => {
+      if (currentCalendarMonth === 0) {
+        currentCalendarMonth = 11;
+        currentCalendarYear -= 1;
+      } else {
+        currentCalendarMonth -= 1;
+      }
+      renderCalendar();
+    });
+    elements.calendarNextBtn.addEventListener("click", () => {
+      if (currentCalendarMonth === 11) {
+        currentCalendarMonth = 0;
+        currentCalendarYear += 1;
+      } else {
+        currentCalendarMonth += 1;
+      }
+      renderCalendar();
+    });
   }
 }
 
