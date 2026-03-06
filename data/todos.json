@@ -1,28 +1,21 @@
 [
   {
+    "id": 1,
+    "title": "리뷰페이퍼 4장 완성",
+    "deadline": "2026-03-08",
+    "priority": 1,
+    "done": false
+  },
+  {
     "id": 2,
     "title": "Mega3 디자인 완성",
     "deadline": "2026-03-07",
-    "priority": 1,
+    "priority": 2,
     "done": false
   },
   {
     "id": 3,
     "title": "기본사업 마일스톤 리뷰",
-    "deadline": "2026-03-08",
-    "priority": 1,
-    "done": false
-  },
-  {
-    "id": 1,
-    "title": "리뷰페이퍼 4장 완성",
-    "deadline": "2026-03-08",
-    "priority": 2,
-    "done": false
-  },
-  {
-    "id": 5,
-    "title": "50주년 행사 투어 회신",
     "deadline": "2026-03-08",
     "priority": 3,
     "done": false
@@ -31,7 +24,7 @@
     "id": 4,
     "title": "이태리 여행 준비",
     "deadline": "2026-03-08",
-    "priority": 4,
+    "priority": 3,
     "done": false
   }
 ]

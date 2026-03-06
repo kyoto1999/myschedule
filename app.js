@@ -29,9 +29,13 @@ const elements = {
   calendarGrid: document.getElementById("calendar-grid"),
   calendarPrevBtn: document.getElementById("calendar-prev-btn"),
   calendarNextBtn: document.getElementById("calendar-next-btn"),
+  deadlineCalendarBtn: document.getElementById("deadline-calendar-btn"),
+  datepickerPopup: document.getElementById("datepicker-popup"),
 };
 
 let editingId = null;
+let datepickerYear;
+let datepickerMonth;
 
 function safeParseDate(value) {
   if (!value) return null;
@@ -85,6 +89,140 @@ function formatYmd(year, monthIndex, day) {
   const mm = String(monthIndex + 1).padStart(2, "0");
   const dd = String(day).padStart(2, "0");
   return `${year}-${mm}-${dd}`;
+}
+
+function parseYmd(value) {
+  if (!value || typeof value !== "string") return null;
+  const trimmed = value.trim();
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
+  if (!match) return null;
+  const y = parseInt(match[1], 10);
+  const m = parseInt(match[2], 10) - 1;
+  const d = parseInt(match[3], 10);
+  if (m < 0 || m > 11 || d < 1 || d > 31) return null;
+  const date = new Date(y, m, d);
+  if (date.getFullYear() !== y || date.getMonth() !== m || date.getDate() !== d) return null;
+  return date;
+}
+
+function openDatepicker() {
+  const inputVal = elements.deadlineInput.value.trim();
+  const parsed = parseYmd(inputVal);
+  const today = new Date();
+  if (parsed) {
+    datepickerYear = parsed.getFullYear();
+    datepickerMonth = parsed.getMonth();
+  } else {
+    datepickerYear = today.getFullYear();
+    datepickerMonth = today.getMonth();
+  }
+  renderDatepicker();
+  if (elements.datepickerPopup) {
+    elements.datepickerPopup.classList.add("is-open");
+    elements.datepickerPopup.setAttribute("aria-hidden", "false");
+  }
+}
+
+function closeDatepicker() {
+  if (elements.datepickerPopup) {
+    elements.datepickerPopup.classList.remove("is-open");
+    elements.datepickerPopup.setAttribute("aria-hidden", "true");
+  }
+}
+
+function renderDatepicker() {
+  if (!elements.datepickerPopup) return;
+  const year = datepickerYear;
+  const month = datepickerMonth;
+  const firstDay = new Date(year, month, 1);
+  const firstWeekday = firstDay.getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const daysInPrevMonth = new Date(year, month, 0).getDate();
+  const todayStr = getTodayString();
+  const selectedStr = elements.deadlineInput.value.trim();
+  const selectedValid = parseYmd(selectedStr);
+
+  let html = "";
+  html += '<div class="datepicker-header">';
+  html += '<span class="datepicker-title">' + year + "년 " + (month + 1) + "월</span>";
+  html += '<div class="datepicker-nav">';
+  html += '<button type="button" class="secondary datepicker-prev">◀</button>';
+  html += '<button type="button" class="secondary datepicker-next">▶</button>';
+  html += "</div></div>";
+  html += '<div class="datepicker-weekdays"><span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span></div>';
+  html += '<div class="datepicker-grid">';
+
+  for (let i = 0; i < 42; i += 1) {
+    let cellYear = year;
+    let cellMonth = month;
+    let day;
+    let isOther = false;
+    if (i < firstWeekday) {
+      isOther = true;
+      cellMonth = month - 1;
+      if (cellMonth < 0) {
+        cellMonth = 11;
+        cellYear = year - 1;
+      }
+      day = daysInPrevMonth - (firstWeekday - 1 - i);
+    } else if (i >= firstWeekday + daysInMonth) {
+      isOther = true;
+      day = i - (firstWeekday + daysInMonth) + 1;
+      cellMonth = month + 1;
+      if (cellMonth > 11) {
+        cellMonth = 0;
+        cellYear = year + 1;
+      }
+    } else {
+      day = i - firstWeekday + 1;
+    }
+    const dateStr = formatYmd(cellYear, cellMonth, day);
+    const isToday = dateStr === todayStr;
+    const isSelected = selectedValid && formatYmd(selectedValid.getFullYear(), selectedValid.getMonth(), selectedValid.getDate()) === dateStr;
+    let cls = "datepicker-day";
+    if (isOther) cls += " other-month";
+    if (isToday) cls += " today";
+    if (isSelected) cls += " selected";
+    html += '<button type="button" class="' + cls + '" data-date="' + dateStr + '">' + day + "</button>";
+  }
+  html += "</div>";
+  elements.datepickerPopup.innerHTML = html;
+
+  elements.datepickerPopup.querySelectorAll(".datepicker-day").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const dateStr = btn.getAttribute("data-date");
+      if (dateStr) {
+        elements.deadlineInput.value = dateStr;
+        closeDatepicker();
+      }
+    });
+  });
+  const prevBtn = elements.datepickerPopup.querySelector(".datepicker-prev");
+  const nextBtn = elements.datepickerPopup.querySelector(".datepicker-next");
+  if (prevBtn) {
+    prevBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (datepickerMonth === 0) {
+        datepickerMonth = 11;
+        datepickerYear -= 1;
+      } else {
+        datepickerMonth -= 1;
+      }
+      renderDatepicker();
+    });
+  }
+  if (nextBtn) {
+    nextBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (datepickerMonth === 11) {
+        datepickerMonth = 0;
+        datepickerYear += 1;
+      } else {
+        datepickerMonth += 1;
+      }
+      renderDatepicker();
+    });
+  }
 }
 
 function saveToLocalStorage() {
@@ -440,16 +578,18 @@ function handleSubmit(e) {
     return;
   }
 
-  if (!deadline) {
-    alert("마감일을 선택해 주세요.");
+  const deadlineParsed = parseYmd(deadline);
+  if (!deadline || !deadlineParsed) {
+    alert("마감일을 YYYY-MM-DD 형식으로 입력하거나 달력에서 선택해 주세요.");
     return;
   }
+  const deadlineStr = formatYmd(deadlineParsed.getFullYear(), deadlineParsed.getMonth(), deadlineParsed.getDate());
 
   if (editingId != null) {
     const todo = todos.find((t) => t.id === editingId);
     if (todo) {
       todo.title = title;
-      todo.deadline = deadline;
+      todo.deadline = deadlineStr;
       if (!Number.isFinite(Number(todo.priority))) {
         todo.priority = defaultPriority;
       }
@@ -459,7 +599,7 @@ function handleSubmit(e) {
     todos.push({
       id: newId,
       title,
-      deadline,
+      deadline: deadlineStr,
       priority: defaultPriority,
       done: false,
     });
@@ -546,6 +686,8 @@ async function init() {
   const today = new Date();
   currentCalendarYear = today.getFullYear();
   currentCalendarMonth = today.getMonth();
+  datepickerYear = today.getFullYear();
+  datepickerMonth = today.getMonth();
 
   loadFromLocalStorage();
   if (todos.length === 0) {
@@ -566,6 +708,28 @@ async function init() {
   if (elements.resetStorageBtn) {
     elements.resetStorageBtn.addEventListener("click", handleResetStorage);
   }
+  if (elements.deadlineInput) {
+    elements.deadlineInput.addEventListener("focus", openDatepicker);
+    elements.deadlineInput.addEventListener("click", openDatepicker);
+  }
+  if (elements.deadlineCalendarBtn) {
+    elements.deadlineCalendarBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      openDatepicker();
+      elements.deadlineInput.focus();
+    });
+  }
+  document.addEventListener("click", (e) => {
+    if (
+      elements.datepickerPopup &&
+      elements.datepickerPopup.classList.contains("is-open") &&
+      !elements.datepickerPopup.contains(e.target) &&
+      !elements.deadlineInput?.contains(e.target) &&
+      !elements.deadlineCalendarBtn?.contains(e.target)
+    ) {
+      closeDatepicker();
+    }
+  });
   if (elements.calendarPrevBtn && elements.calendarNextBtn) {
     elements.calendarPrevBtn.addEventListener("click", () => {
       if (currentCalendarMonth === 0) {

@@ -29,9 +29,13 @@
             <label for="title-input">할 일</label>
             <input id="title-input" type="text" placeholder="무엇을 할까요?" required />
           </div>
-          <div class="form-row">
+          <div class="form-row deadline-row">
             <label for="deadline-input">마감일</label>
-            <input id="deadline-input" type="date" required />
+            <div class="deadline-picker-wrap">
+              <input id="deadline-input" type="text" placeholder="YYYY-MM-DD 또는 클릭" required autocomplete="off" />
+              <button type="button" id="deadline-calendar-btn" class="calendar-trigger-btn" title="달력에서 선택">📅</button>
+              <div id="datepicker-popup" class="datepicker-popup" aria-hidden="true"></div>
+            </div>
           </div>
           <div class="form-actions">
             <button type="submit" id="add-btn">추가</button>

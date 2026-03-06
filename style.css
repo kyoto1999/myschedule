@@ -163,6 +163,120 @@ body {
   color: var(--text-subtle);
 }
 
+.deadline-picker-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.deadline-picker-wrap input {
+  flex: 1;
+  min-width: 0;
+}
+
+.calendar-trigger-btn {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  border-radius: var(--radius-md);
+}
+
+.datepicker-popup {
+  position: absolute;
+  left: 0;
+  top: 100%;
+  margin-top: 6px;
+  z-index: 100;
+  min-width: 240px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(51, 65, 85, 0.95);
+  background: var(--card);
+  box-shadow: var(--shadow-soft);
+  display: none;
+}
+
+.datepicker-popup.is-open {
+  display: block;
+}
+
+.datepicker-popup .datepicker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.datepicker-popup .datepicker-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.datepicker-popup .datepicker-nav {
+  display: flex;
+  gap: 4px;
+}
+
+.datepicker-popup .datepicker-nav button {
+  padding: 4px 8px;
+  font-size: 0.8rem;
+}
+
+.datepicker-popup .datepicker-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  font-size: 0.7rem;
+  color: var(--text-subtle);
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+.datepicker-popup .datepicker-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.datepicker-popup .datepicker-day {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  border-radius: 8px;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  color: var(--text);
+}
+
+.datepicker-popup .datepicker-day:hover {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.datepicker-popup .datepicker-day.other-month {
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
+.datepicker-popup .datepicker-day.today {
+  border: 1px solid var(--accent);
+  color: var(--accent);
+}
+
+.datepicker-popup .datepicker-day.selected {
+  background: var(--accent);
+  color: #0b1120;
+}
+
 input,
 select {
   background-color: #020617;
