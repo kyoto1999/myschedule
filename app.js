@@ -17,7 +17,6 @@ const elements = {
   todoForm: document.getElementById("todo-form"),
   titleInput: document.getElementById("title-input"),
   deadlineInput: document.getElementById("deadline-input"),
-  priorityInput: document.getElementById("priority-input"),
   resetFormBtn: document.getElementById("reset-form-btn"),
 
   filterSelect: document.getElementById("filter-select"),
@@ -136,7 +135,6 @@ function updateLockUI() {
   const disabled = !isUnlocked;
   elements.titleInput.disabled = disabled;
   elements.deadlineInput.disabled = disabled;
-  elements.priorityInput.disabled = disabled;
   elements.resetFormBtn.disabled = disabled;
   elements.todoForm.querySelector("button[type='submit']").disabled = disabled;
 
@@ -226,14 +224,42 @@ function renderTodos() {
       meta.appendChild(badgeDeadline);
     }
 
-    const prioBadge = document.createElement("span");
-    prioBadge.className = "badge badge-priority";
-    const prioNum = Number(todo.priority) || 0;
+    const prioContainer = document.createElement("span");
+    prioContainer.className = "badge badge-priority";
+    const prioNum = Number(todo.priority) || 3;
     if (prioNum === 1 || prioNum === 2) {
-      prioBadge.classList.add("badge-priority-high");
+      prioContainer.classList.add("badge-priority-high");
     }
-    prioBadge.textContent = `우선순위: ${todo.priority ?? "-"}`;
-    meta.appendChild(prioBadge);
+
+    if (isUnlocked) {
+      const select = document.createElement("select");
+      select.style.background = "transparent";
+      select.style.border = "none";
+      select.style.color = "inherit";
+      select.style.fontSize = "0.78rem";
+
+      for (let v = 1; v <= 5; v += 1) {
+        const opt = document.createElement("option");
+        opt.value = String(v);
+        opt.textContent = `우선순위 ${v}`;
+        if (v === prioNum) opt.selected = true;
+        select.appendChild(opt);
+      }
+
+      select.addEventListener("change", () => {
+        todo.priority = Number(select.value);
+        saveToLocalStorage();
+        todos.sort(compareTodos);
+        renderTodos();
+      });
+
+      prioContainer.textContent = "";
+      prioContainer.appendChild(select);
+    } else {
+      prioContainer.textContent = `우선순위: ${todo.priority ?? "-"}`;
+    }
+
+    meta.appendChild(prioContainer);
 
     const statusBadge = document.createElement("span");
     statusBadge.className = "badge badge-status-pending";
@@ -387,7 +413,6 @@ function renderCalendar() {
 function resetForm() {
   editingId = null;
   elements.todoForm.reset();
-  elements.priorityInput.value = "3";
   const submitBtn = elements.todoForm.querySelector("button[type='submit']");
   submitBtn.textContent = "추가";
 }
@@ -398,7 +423,6 @@ function startEdit(id) {
   editingId = id;
   elements.titleInput.value = todo.title || "";
   elements.deadlineInput.value = todo.deadline || "";
-  elements.priorityInput.value = todo.priority ?? "3";
   const submitBtn = elements.todoForm.querySelector("button[type='submit']");
   submitBtn.textContent = "수정 저장";
 }
@@ -409,7 +433,7 @@ function handleSubmit(e) {
 
   const title = elements.titleInput.value.trim();
   const deadline = elements.deadlineInput.value;
-  const priority = elements.priorityInput.value || "3";
+  const defaultPriority = 3;
 
   if (!title) {
     alert("할 일 제목을 입력해 주세요.");
@@ -426,7 +450,9 @@ function handleSubmit(e) {
     if (todo) {
       todo.title = title;
       todo.deadline = deadline;
-      todo.priority = Number(priority);
+      if (!Number.isFinite(Number(todo.priority))) {
+        todo.priority = defaultPriority;
+      }
     }
   } else {
     const newId = todos.length === 0 ? 1 : Math.max(...todos.map((t) => t.id || 0)) + 1;
@@ -434,7 +460,7 @@ function handleSubmit(e) {
       id: newId,
       title,
       deadline,
-      priority: Number(priority),
+      priority: defaultPriority,
       done: false,
     });
   }
