@@ -29,6 +29,16 @@
             <label for="title-input">할 일</label>
             <input id="title-input" type="text" placeholder="무엇을 할까요?" required />
           </div>
+          <div class="form-row">
+            <label for="department-select">요청 부서</label>
+            <select id="department-select" required>
+              <option value="">선택</option>
+              <option value="개인">개인</option>
+              <option value="전략기획단">전략기획단</option>
+              <option value="정책센터">정책센터</option>
+              <option value="대외협력실">대외협력실</option>
+            </select>
+          </div>
           <div class="form-row deadline-row">
             <label for="deadline-input">마감일</label>
             <div class="deadline-picker-wrap">
@@ -60,12 +70,17 @@
         </div>
       </section>
 
-      <section class="todo-list-section">
-        <h2>할 일 목록</h2>
+      <section class="department-section">
+        <h2>요청 부서별 할 일</h2>
         <div id="todo-list-empty" class="empty-message">
           아직 등록된 할 일이 없습니다. 위에서 새로운 할 일을 추가해 보세요.
         </div>
-        <div id="todo-list" class="todo-list"></div>
+        <div id="department-list" class="department-list"></div>
+      </section>
+
+      <section class="priority-titles-section">
+        <h2>우선순위별 제목</h2>
+        <div id="priority-titles-list" class="priority-titles-list"></div>
       </section>
 
       <section class="calendar-section" id="calendar-section">

@@ -2,6 +2,7 @@
 const EDIT_PASSWORD = "myschedule123"; // 원하면 나중에 바꿔 쓰세요.
 const STORAGE_KEY = "myschedule_todos_v1";
 const UNLOCK_KEY = "myschedule_unlocked_v1";
+const DEPARTMENT_LIST = ["개인", "전략기획단", "정책센터", "대외협력실"];
 
 let todos = [];
 let isUnlocked = false;
@@ -16,12 +17,14 @@ const elements = {
 
   todoForm: document.getElementById("todo-form"),
   titleInput: document.getElementById("title-input"),
+  departmentSelect: document.getElementById("department-select"),
   deadlineInput: document.getElementById("deadline-input"),
   resetFormBtn: document.getElementById("reset-form-btn"),
 
   filterSelect: document.getElementById("filter-select"),
-  todoList: document.getElementById("todo-list"),
   todoListEmpty: document.getElementById("todo-list-empty"),
+  departmentList: document.getElementById("department-list"),
+  priorityTitlesList: document.getElementById("priority-titles-list"),
   exportJsonBtn: document.getElementById("export-json-btn"),
   resetStorageBtn: document.getElementById("reset-storage-btn"),
   calendarSection: document.getElementById("calendar-section"),
@@ -59,6 +62,21 @@ function compareTodos(a, b) {
   const pb = Number(b.priority) || 999;
   if (pa !== pb) return pa - pb;
 
+  return (a.id || 0) - (b.id || 0);
+}
+
+function compareByPriority(a, b) {
+  const pa = Number(a.priority) || 999;
+  const pb = Number(b.priority) || 999;
+  if (pa !== pb) return pa - pb;
+  const dateA = safeParseDate(a.deadline);
+  const dateB = safeParseDate(b.deadline);
+  if (!dateA && dateB) return 1;
+  if (dateA && !dateB) return -1;
+  if (dateA && dateB) {
+    const diff = dateA - dateB;
+    if (diff !== 0) return diff;
+  }
   return (a.id || 0) - (b.id || 0);
 }
 
@@ -272,6 +290,7 @@ function updateLockUI() {
 
   const disabled = !isUnlocked;
   elements.titleInput.disabled = disabled;
+  if (elements.departmentSelect) elements.departmentSelect.disabled = disabled;
   elements.deadlineInput.disabled = disabled;
   elements.resetFormBtn.disabled = disabled;
   elements.todoForm.querySelector("button[type='submit']").disabled = disabled;
@@ -286,175 +305,239 @@ function updateLockUI() {
    }
 }
 
+function getTodoDepartment(todo) {
+  const d = todo.department;
+  return DEPARTMENT_LIST.includes(d) ? d : DEPARTMENT_LIST[0];
+}
+
+function createTodoItem(todo) {
+  const item = document.createElement("div");
+  item.className = "todo-item";
+
+  if (!todo.done) {
+    if (isOverdue(todo.deadline)) {
+      item.classList.add("overdue");
+    } else if (isDueSoon(todo.deadline)) {
+      item.classList.add("due-soon");
+    }
+  }
+
+  const main = document.createElement("div");
+  main.className = "todo-main";
+
+  const checkbox = document.createElement("input");
+  checkbox.type = "checkbox";
+  checkbox.className = "todo-checkbox";
+  checkbox.checked = !!todo.done;
+  checkbox.addEventListener("change", () => {
+    todo.done = checkbox.checked;
+    saveToLocalStorage();
+    renderTodos();
+  });
+
+  const content = document.createElement("div");
+  content.className = "todo-content";
+
+  const title = document.createElement("div");
+  title.className = "todo-title";
+  title.textContent = todo.title;
+  if (todo.done) {
+    title.classList.add("done");
+  }
+
+  const meta = document.createElement("div");
+  meta.className = "todo-meta";
+
+  if (todo.deadline) {
+    const badgeDeadline = document.createElement("span");
+    badgeDeadline.className = "badge badge-deadline";
+    badgeDeadline.textContent = `마감일: ${todo.deadline}`;
+    meta.appendChild(badgeDeadline);
+  }
+
+  const prioContainer = document.createElement("span");
+  prioContainer.className = "badge badge-priority";
+  const prioNum = Number(todo.priority) || 3;
+  if (prioNum === 1 || prioNum === 2) {
+    prioContainer.classList.add("badge-priority-high");
+  }
+
+  if (isUnlocked) {
+    const select = document.createElement("select");
+    select.style.background = "transparent";
+    select.style.border = "none";
+    select.style.color = "inherit";
+    select.style.fontSize = "0.78rem";
+
+    for (let v = 1; v <= 5; v += 1) {
+      const opt = document.createElement("option");
+      opt.value = String(v);
+      opt.textContent = `우선순위 ${v}`;
+      if (v === prioNum) opt.selected = true;
+      select.appendChild(opt);
+    }
+
+    select.addEventListener("change", () => {
+      todo.priority = Number(select.value);
+      saveToLocalStorage();
+      todos.sort(compareTodos);
+      renderTodos();
+    });
+
+    prioContainer.textContent = "";
+    prioContainer.appendChild(select);
+  } else {
+    prioContainer.textContent = `우선순위: ${todo.priority ?? "-"}`;
+  }
+
+  meta.appendChild(prioContainer);
+
+  const statusBadge = document.createElement("span");
+  statusBadge.className = "badge badge-status-pending";
+  if (todo.done) {
+    statusBadge.classList.add("badge-status-done");
+    statusBadge.textContent = "완료";
+  } else if (isOverdue(todo.deadline)) {
+    statusBadge.textContent = "지남";
+  } else if (isDueSoon(todo.deadline)) {
+    statusBadge.textContent = "임박";
+  } else {
+    statusBadge.textContent = "진행 중";
+  }
+  meta.appendChild(statusBadge);
+
+  content.appendChild(title);
+  content.appendChild(meta);
+
+  main.appendChild(checkbox);
+  main.appendChild(content);
+
+  const actions = document.createElement("div");
+  actions.className = "todo-actions";
+
+  const editBtn = document.createElement("button");
+  editBtn.type = "button";
+  editBtn.textContent = "수정";
+  editBtn.className = "edit-btn";
+  editBtn.addEventListener("click", () => {
+    if (!isUnlocked) return;
+    startEdit(todo.id);
+  });
+
+  const deleteBtn = document.createElement("button");
+  deleteBtn.type = "button";
+  deleteBtn.textContent = "삭제";
+  deleteBtn.className = "delete-btn";
+  deleteBtn.addEventListener("click", () => {
+    if (!isUnlocked) return;
+    const ok = confirm("정말로 이 할 일을 삭제하시겠습니까?");
+    if (!ok) return;
+    todos = todos.filter((t) => t.id !== todo.id);
+    saveToLocalStorage();
+    renderTodos();
+  });
+
+  actions.appendChild(editBtn);
+  actions.appendChild(deleteBtn);
+
+  item.appendChild(main);
+  item.appendChild(actions);
+
+  return item;
+}
+
 function renderTodos() {
-  if (!elements.todoList) return;
+  if (!elements.departmentList) return;
 
   const filter = elements.filterSelect.value;
   const todayStr = getTodayString();
 
-  const sorted = [...todos].sort(compareTodos);
+  const applyFilter = (list) => {
+    return list.filter((todo) => {
+      if (filter === "today") {
+        return todo.deadline === todayStr && !todo.done;
+      }
+      if (filter === "pending") {
+        return !todo.done;
+      }
+      if (filter === "done") {
+        return !!todo.done;
+      }
+      return true;
+    });
+  };
 
-  const filtered = sorted.filter((todo) => {
-    if (filter === "today") {
-      return todo.deadline === todayStr && !todo.done;
-    }
-    if (filter === "pending") {
-      return !todo.done;
-    }
-    if (filter === "done") {
-      return !!todo.done;
-    }
-    return true;
+  elements.departmentList.innerHTML = "";
+
+  let totalFiltered = 0;
+
+  DEPARTMENT_LIST.forEach((dept) => {
+    const deptTodos = todos.filter((t) => getTodoDepartment(t) === dept);
+    const filtered = applyFilter([...deptTodos].sort(compareTodos));
+
+    const block = document.createElement("div");
+    block.className = "department-block";
+
+    const heading = document.createElement("h3");
+    heading.className = "department-heading";
+    heading.textContent = dept;
+
+    const list = document.createElement("div");
+    list.className = "todo-list";
+
+    filtered.forEach((todo) => {
+      list.appendChild(createTodoItem(todo));
+      totalFiltered += 1;
+    });
+
+    block.appendChild(heading);
+    block.appendChild(list);
+    elements.departmentList.appendChild(block);
   });
 
-  elements.todoList.innerHTML = "";
-
-  if (filtered.length === 0) {
+  if (totalFiltered === 0) {
     elements.todoListEmpty.style.display = "block";
-    renderCalendar();
-    return;
+  } else {
+    elements.todoListEmpty.style.display = "none";
   }
 
-  elements.todoListEmpty.style.display = "none";
-
-  filtered.forEach((todo) => {
-    const item = document.createElement("div");
-    item.className = "todo-item";
-
-    if (!todo.done) {
-      if (isOverdue(todo.deadline)) {
-        item.classList.add("overdue");
-      } else if (isDueSoon(todo.deadline)) {
-        item.classList.add("due-soon");
-      }
-    }
-
-    const main = document.createElement("div");
-    main.className = "todo-main";
-
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox";
-    checkbox.className = "todo-checkbox";
-    checkbox.checked = !!todo.done;
-    checkbox.addEventListener("change", () => {
-      todo.done = checkbox.checked;
-      saveToLocalStorage();
-      renderTodos();
-    });
-
-    const content = document.createElement("div");
-    content.className = "todo-content";
-
-    const title = document.createElement("div");
-    title.className = "todo-title";
-    title.textContent = todo.title;
-    if (todo.done) {
-      title.classList.add("done");
-    }
-
-    const meta = document.createElement("div");
-    meta.className = "todo-meta";
-
-    if (todo.deadline) {
-      const badgeDeadline = document.createElement("span");
-      badgeDeadline.className = "badge badge-deadline";
-      badgeDeadline.textContent = `마감일: ${todo.deadline}`;
-      meta.appendChild(badgeDeadline);
-    }
-
-    const prioContainer = document.createElement("span");
-    prioContainer.className = "badge badge-priority";
-    const prioNum = Number(todo.priority) || 3;
-    if (prioNum === 1 || prioNum === 2) {
-      prioContainer.classList.add("badge-priority-high");
-    }
-
-    if (isUnlocked) {
-      const select = document.createElement("select");
-      select.style.background = "transparent";
-      select.style.border = "none";
-      select.style.color = "inherit";
-      select.style.fontSize = "0.78rem";
-
-      for (let v = 1; v <= 5; v += 1) {
-        const opt = document.createElement("option");
-        opt.value = String(v);
-        opt.textContent = `우선순위 ${v}`;
-        if (v === prioNum) opt.selected = true;
-        select.appendChild(opt);
-      }
-
-      select.addEventListener("change", () => {
-        todo.priority = Number(select.value);
-        saveToLocalStorage();
-        todos.sort(compareTodos);
-        renderTodos();
-      });
-
-      prioContainer.textContent = "";
-      prioContainer.appendChild(select);
-    } else {
-      prioContainer.textContent = `우선순위: ${todo.priority ?? "-"}`;
-    }
-
-    meta.appendChild(prioContainer);
-
-    const statusBadge = document.createElement("span");
-    statusBadge.className = "badge badge-status-pending";
-    if (todo.done) {
-      statusBadge.classList.add("badge-status-done");
-      statusBadge.textContent = "완료";
-    } else if (isOverdue(todo.deadline)) {
-      statusBadge.textContent = "지남";
-    } else if (isDueSoon(todo.deadline)) {
-      statusBadge.textContent = "임박";
-    } else {
-      statusBadge.textContent = "진행 중";
-    }
-    meta.appendChild(statusBadge);
-
-    content.appendChild(title);
-    content.appendChild(meta);
-
-    main.appendChild(checkbox);
-    main.appendChild(content);
-
-    const actions = document.createElement("div");
-    actions.className = "todo-actions";
-
-    const editBtn = document.createElement("button");
-    editBtn.type = "button";
-    editBtn.textContent = "수정";
-    editBtn.className = "edit-btn";
-    editBtn.addEventListener("click", () => {
-      if (!isUnlocked) return;
-      startEdit(todo.id);
-    });
-
-    const deleteBtn = document.createElement("button");
-    deleteBtn.type = "button";
-    deleteBtn.textContent = "삭제";
-    deleteBtn.className = "delete-btn";
-    deleteBtn.addEventListener("click", () => {
-      if (!isUnlocked) return;
-      const ok = confirm("정말로 이 할 일을 삭제하시겠습니까?");
-      if (!ok) return;
-      todos = todos.filter((t) => t.id !== todo.id);
-      saveToLocalStorage();
-      renderTodos();
-    });
-
-    actions.appendChild(editBtn);
-    actions.appendChild(deleteBtn);
-
-    item.appendChild(main);
-    item.appendChild(actions);
-
-    elements.todoList.appendChild(item);
-  });
-
+  renderPriorityTitles(filter, todayStr);
   updateLockUI();
   renderCalendar();
+}
+
+function renderPriorityTitles(filter, todayStr) {
+  if (!elements.priorityTitlesList) return;
+  const applyFilter = (list) =>
+    list.filter((todo) => {
+      if (filter === "today") return todo.deadline === todayStr && !todo.done;
+      if (filter === "pending") return !todo.done;
+      if (filter === "done") return !!todo.done;
+      return true;
+    });
+  const filtered = applyFilter([...todos].sort(compareByPriority));
+  elements.priorityTitlesList.innerHTML = "";
+  if (filtered.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "empty-message";
+    empty.textContent = "표시할 할 일이 없습니다.";
+    elements.priorityTitlesList.appendChild(empty);
+    return;
+  }
+  filtered.forEach((todo) => {
+    const row = document.createElement("div");
+    row.className = "priority-title-row";
+    const prio = document.createElement("span");
+    prio.className = "priority-title-prio";
+    prio.textContent = `P${todo.priority ?? "-"}`;
+    const title = document.createElement("span");
+    title.className = "priority-title-text";
+    title.textContent = todo.title || "(제목 없음)";
+    if (todo.done) title.classList.add("done");
+    row.appendChild(prio);
+    row.appendChild(title);
+    elements.priorityTitlesList.appendChild(row);
+  });
 }
 
 function renderCalendar() {
@@ -551,6 +634,9 @@ function renderCalendar() {
 function resetForm() {
   editingId = null;
   elements.todoForm.reset();
+  if (elements.departmentSelect) {
+    elements.departmentSelect.value = "";
+  }
   const submitBtn = elements.todoForm.querySelector("button[type='submit']");
   submitBtn.textContent = "추가";
 }
@@ -561,6 +647,10 @@ function startEdit(id) {
   editingId = id;
   elements.titleInput.value = todo.title || "";
   elements.deadlineInput.value = todo.deadline || "";
+  if (elements.departmentSelect) {
+    const dept = getTodoDepartment(todo);
+    elements.departmentSelect.value = dept;
+  }
   const submitBtn = elements.todoForm.querySelector("button[type='submit']");
   submitBtn.textContent = "수정 저장";
 }
@@ -570,11 +660,17 @@ function handleSubmit(e) {
   if (!isUnlocked) return;
 
   const title = elements.titleInput.value.trim();
+  const department = elements.departmentSelect?.value?.trim() || "";
   const deadline = elements.deadlineInput.value;
   const defaultPriority = 3;
 
   if (!title) {
     alert("할 일 제목을 입력해 주세요.");
+    return;
+  }
+
+  if (!department || !DEPARTMENT_LIST.includes(department)) {
+    alert("요청 부서를 선택해 주세요.");
     return;
   }
 
@@ -590,6 +686,7 @@ function handleSubmit(e) {
     if (todo) {
       todo.title = title;
       todo.deadline = deadlineStr;
+      todo.department = department;
       if (!Number.isFinite(Number(todo.priority))) {
         todo.priority = defaultPriority;
       }
@@ -600,6 +697,7 @@ function handleSubmit(e) {
       id: newId,
       title,
       deadline: deadlineStr,
+      department,
       priority: defaultPriority,
       done: false,
     });

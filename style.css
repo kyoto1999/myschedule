@@ -126,6 +126,8 @@ body {
 
 .todo-form-section,
 .todo-list-section,
+.department-section,
+.priority-titles-section,
 .toolbar-section {
   background: radial-gradient(circle at top right, #020617 0, #020617 55%, #020617 100%);
   border-radius: var(--radius-lg);
@@ -134,13 +136,17 @@ body {
 }
 
 .todo-form-section h2,
-.todo-list-section h2 {
+.todo-list-section h2,
+.department-section h2,
+.priority-titles-section h2 {
   margin: 0 0 8px;
   font-size: 1.05rem;
 }
 
 .todo-form-section h2::after,
-.todo-list-section h2::after {
+.todo-list-section h2::after,
+.department-section h2::after,
+.priority-titles-section h2::after {
   content: "";
   display: inline-block;
   width: 6px;
@@ -372,8 +378,89 @@ button:disabled {
   min-width: 120px;
 }
 
-.todo-list-section {
+.todo-list-section,
+.department-section {
   padding-top: 14px;
+}
+
+.department-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.department-block {
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(51, 65, 85, 0.9);
+  padding: 12px 14px;
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.department-heading {
+  margin: 0 0 10px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.department-block .todo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 0;
+}
+
+.priority-titles-section {
+  background: radial-gradient(circle at top right, #020617 0, #020617 55%, #020617 100%);
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(51, 65, 85, 0.9);
+  padding: 16px 18px;
+}
+
+.priority-titles-section h2 {
+  margin: 0 0 10px;
+  font-size: 1.05rem;
+}
+
+.priority-titles-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.priority-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+.priority-title-row:hover {
+  background: rgba(56, 189, 248, 0.08);
+}
+
+.priority-title-prio {
+  flex-shrink: 0;
+  min-width: 28px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: var(--accent-soft);
+  color: var(--accent);
+  text-align: center;
+}
+
+.priority-title-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.priority-title-text.done {
+  text-decoration: line-through;
+  color: var(--text-muted);
 }
 
 .calendar-section {
