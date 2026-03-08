@@ -638,8 +638,37 @@ button:disabled {
   color: #bbf7d0;
 }
 
+.badge-status-progress {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: #e0f2fe;
+}
+
 .badge-status-pending {
   border-color: rgba(148, 163, 184, 0.9);
+}
+
+.todo-inprogress-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.78rem;
+  color: var(--text-subtle);
+  cursor: pointer;
+  user-select: none;
+}
+
+.todo-inprogress-wrap:has(.todo-inprogress-checkbox:disabled) {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.todo-inprogress-checkbox {
+  cursor: pointer;
+}
+
+.todo-inprogress-label {
+  white-space: nowrap;
 }
 
 .todo-actions {

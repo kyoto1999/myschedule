@@ -300,6 +300,10 @@ function updateLockUI() {
     btn.disabled = disabled;
   });
 
+  document.querySelectorAll(".todo-inprogress-checkbox").forEach((cb) => {
+    cb.disabled = disabled;
+  });
+
    if (elements.resetStorageBtn) {
      elements.resetStorageBtn.disabled = disabled;
    }
@@ -329,11 +333,30 @@ function createTodoItem(todo) {
   checkbox.type = "checkbox";
   checkbox.className = "todo-checkbox";
   checkbox.checked = !!todo.done;
+  checkbox.title = "완료";
   checkbox.addEventListener("change", () => {
     todo.done = checkbox.checked;
     saveToLocalStorage();
     renderTodos();
   });
+
+  const inProgressWrap = document.createElement("label");
+  inProgressWrap.className = "todo-inprogress-wrap";
+  inProgressWrap.title = "시작했으면 체크 (진행 중인 작업)";
+  const inProgressCheck = document.createElement("input");
+  inProgressCheck.type = "checkbox";
+  inProgressCheck.className = "todo-inprogress-checkbox";
+  inProgressCheck.checked = !!todo.inProgress;
+  inProgressCheck.addEventListener("change", () => {
+    todo.inProgress = inProgressCheck.checked;
+    saveToLocalStorage();
+    renderTodos();
+  });
+  const inProgressLabel = document.createElement("span");
+  inProgressLabel.className = "todo-inprogress-label";
+  inProgressLabel.textContent = "시작";
+  inProgressWrap.appendChild(inProgressCheck);
+  inProgressWrap.appendChild(inProgressLabel);
 
   const content = document.createElement("div");
   content.className = "todo-content";
@@ -397,12 +420,15 @@ function createTodoItem(todo) {
   if (todo.done) {
     statusBadge.classList.add("badge-status-done");
     statusBadge.textContent = "완료";
+  } else if (todo.inProgress) {
+    statusBadge.classList.add("badge-status-progress");
+    statusBadge.textContent = "진행";
   } else if (isOverdue(todo.deadline)) {
     statusBadge.textContent = "지남";
   } else if (isDueSoon(todo.deadline)) {
     statusBadge.textContent = "임박";
   } else {
-    statusBadge.textContent = "진행 중";
+    statusBadge.textContent = "대기";
   }
   meta.appendChild(statusBadge);
 
@@ -410,6 +436,7 @@ function createTodoItem(todo) {
   content.appendChild(meta);
 
   main.appendChild(checkbox);
+  main.appendChild(inProgressWrap);
   main.appendChild(content);
 
   const actions = document.createElement("div");
