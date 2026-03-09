@@ -371,12 +371,27 @@ function createTodoItem(todo) {
   const meta = document.createElement("div");
   meta.className = "todo-meta";
 
-  if (todo.deadline) {
-    const badgeDeadline = document.createElement("span");
-    badgeDeadline.className = "badge badge-deadline";
-    badgeDeadline.textContent = `마감일: ${todo.deadline}`;
-    meta.appendChild(badgeDeadline);
+  const badgeDeadline = document.createElement("span");
+  badgeDeadline.className = "badge badge-deadline";
+  if (isUnlocked) {
+    const deadlineLabel = document.createElement("span");
+    deadlineLabel.textContent = "마감일: ";
+    const deadlineInput = document.createElement("input");
+    deadlineInput.type = "date";
+    deadlineInput.className = "todo-deadline-input";
+    deadlineInput.value = todo.deadline || "";
+    deadlineInput.title = "마감일 수정";
+    deadlineInput.addEventListener("change", () => {
+      todo.deadline = deadlineInput.value || null;
+      saveToLocalStorage();
+      renderTodos();
+    });
+    badgeDeadline.appendChild(deadlineLabel);
+    badgeDeadline.appendChild(deadlineInput);
+  } else {
+    badgeDeadline.textContent = todo.deadline ? `마감일: ${todo.deadline}` : "마감일: -";
   }
+  meta.appendChild(badgeDeadline);
 
   const prioContainer = document.createElement("span");
   prioContainer.className = "badge badge-priority";
