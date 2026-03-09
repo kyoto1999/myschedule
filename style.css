@@ -648,6 +648,32 @@ button:disabled {
   border-color: rgba(148, 163, 184, 0.9);
 }
 
+.badge-dept-move {
+  border-color: rgba(148, 163, 184, 0.9);
+  display: inline-flex;
+  align-items: center;
+}
+
+.badge-dept-move .department-move-select {
+  appearance: menulist;
+  -webkit-appearance: menulist;
+  -moz-appearance: menulist;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(51, 65, 85, 0.95);
+  color: inherit;
+  font-size: 0.78rem;
+  padding: 2px 20px 2px 6px;
+  cursor: pointer;
+  min-width: 72px;
+  border-radius: 6px;
+  outline: none;
+}
+
+.badge-dept-move .department-move-select:hover,
+.badge-dept-move .department-move-select:focus {
+  border-color: var(--accent);
+}
+
 .todo-inprogress-wrap {
   display: inline-flex;
   align-items: center;

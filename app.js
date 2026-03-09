@@ -2,7 +2,7 @@
 const EDIT_PASSWORD = "myschedule123"; // 원하면 나중에 바꿔 쓰세요.
 const STORAGE_KEY = "myschedule_todos_v1";
 const UNLOCK_KEY = "myschedule_unlocked_v1";
-const DEPARTMENT_LIST = ["개인", "전략기획단", "정책센터", "대외협력실"];
+const DEPARTMENT_LIST = ["개인", "전략기획단", "정책센터", "대외협력실", "기본사업", "대한설비공학회"];
 
 let todos = [];
 let isUnlocked = false;
@@ -414,6 +414,31 @@ function createTodoItem(todo) {
   }
 
   meta.appendChild(prioContainer);
+
+  const deptMoveContainer = document.createElement("span");
+  deptMoveContainer.className = "badge badge-dept-move";
+  const currentDept = getTodoDepartment(todo);
+  if (isUnlocked) {
+    const deptSelect = document.createElement("select");
+    deptSelect.className = "department-move-select";
+    deptSelect.title = "요청 부서로 이동";
+    DEPARTMENT_LIST.forEach((d) => {
+      const opt = document.createElement("option");
+      opt.value = d;
+      opt.textContent = d;
+      if (d === currentDept) opt.selected = true;
+      deptSelect.appendChild(opt);
+    });
+    deptSelect.addEventListener("change", () => {
+      todo.department = deptSelect.value;
+      saveToLocalStorage();
+      renderTodos();
+    });
+    deptMoveContainer.appendChild(deptSelect);
+  } else {
+    deptMoveContainer.textContent = `부서: ${currentDept}`;
+  }
+  meta.appendChild(deptMoveContainer);
 
   const statusBadge = document.createElement("span");
   statusBadge.className = "badge badge-status-pending";
