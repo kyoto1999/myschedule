@@ -80,8 +80,22 @@
         <div id="department-list" class="department-list"></div>
       </section>
 
+      <section class="completed-section" id="completed-section">
+        <h2>완료</h2>
+        <div id="completed-list-empty" class="empty-message">
+          완료된 할 일이 없습니다.
+        </div>
+        <div id="completed-list" class="completed-list"></div>
+      </section>
+
       <section class="priority-titles-section">
-        <h2>우선순위별 제목</h2>
+        <div class="priority-titles-header">
+          <h2>우선순위별 제목</h2>
+          <div class="priority-date-filter">
+            <label for="priority-date-input">해당 날짜</label>
+            <input id="priority-date-input" type="date" title="날짜를 선택하면 해당 날짜의 할 일만 표시" />
+          </div>
+        </div>
         <div id="priority-titles-list" class="priority-titles-list"></div>
       </section>
 

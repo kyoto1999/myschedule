@@ -24,7 +24,12 @@ const elements = {
   filterSelect: document.getElementById("filter-select"),
   todoListEmpty: document.getElementById("todo-list-empty"),
   departmentList: document.getElementById("department-list"),
+  departmentSection: document.querySelector(".department-section"),
+  completedSection: document.getElementById("completed-section"),
+  completedList: document.getElementById("completed-list"),
+  completedListEmpty: document.getElementById("completed-list-empty"),
   priorityTitlesList: document.getElementById("priority-titles-list"),
+  priorityDateInput: document.getElementById("priority-date-input"),
   exportJsonBtn: document.getElementById("export-json-btn"),
   resetStorageBtn: document.getElementById("reset-storage-btn"),
   calendarSection: document.getElementById("calendar-section"),
@@ -539,7 +544,7 @@ function renderTodos() {
   let totalFiltered = 0;
 
   DEPARTMENT_LIST.forEach((dept) => {
-    const deptTodos = todos.filter((t) => getTodoDepartment(t) === dept);
+    const deptTodos = todos.filter((t) => getTodoDepartment(t) === dept && !t.done);
     const filtered = applyFilter([...deptTodos].sort(compareTodos));
 
     const block = document.createElement("div");
@@ -568,6 +573,30 @@ function renderTodos() {
     elements.todoListEmpty.style.display = "none";
   }
 
+  const completedTodos = todos.filter((t) => t.done).sort(compareTodos);
+  if (elements.completedSection) {
+    elements.completedSection.style.display = filter === "pending" ? "none" : "";
+  }
+  if (elements.departmentSection) {
+    elements.departmentSection.style.display = filter === "done" ? "none" : "";
+  }
+  if (elements.completedList) {
+    elements.completedList.innerHTML = "";
+    if (filter !== "pending") {
+      elements.completedList.style.display = "flex";
+      if (completedTodos.length === 0) {
+        if (elements.completedListEmpty) {
+          elements.completedListEmpty.style.display = "block";
+        }
+      } else {
+        if (elements.completedListEmpty) elements.completedListEmpty.style.display = "none";
+        completedTodos.forEach((todo) => {
+          elements.completedList.appendChild(createTodoItem(todo));
+        });
+      }
+    }
+  }
+
   renderPriorityTitles(filter, todayStr);
   updateLockUI();
   renderCalendar();
@@ -575,8 +604,10 @@ function renderTodos() {
 
 function renderPriorityTitles(filter, todayStr) {
   if (!elements.priorityTitlesList) return;
+  const selectedDate = elements.priorityDateInput?.value?.trim();
   const applyFilter = (list) =>
     list.filter((todo) => {
+      if (selectedDate) return todo.deadline === selectedDate;
       if (filter === "today") return todo.deadline === todayStr && !todo.done;
       if (filter === "pending") return !todo.done;
       if (filter === "done") return !!todo.done;
@@ -594,14 +625,37 @@ function renderPriorityTitles(filter, todayStr) {
   filtered.forEach((todo) => {
     const row = document.createElement("div");
     row.className = "priority-title-row";
-    const prio = document.createElement("span");
-    prio.className = "priority-title-prio";
-    prio.textContent = `P${todo.priority ?? "-"}`;
+    const prioCell = document.createElement("div");
+    prioCell.className = "priority-title-prio-cell";
+    if (isUnlocked) {
+      const prioSelect = document.createElement("select");
+      prioSelect.className = "priority-title-prio-select";
+      prioSelect.title = "우선순위 변경";
+      for (let v = 1; v <= 5; v += 1) {
+        const opt = document.createElement("option");
+        opt.value = String(v);
+        opt.textContent = String(v);
+        if (v === (todo.priority ?? 3)) opt.selected = true;
+        prioSelect.appendChild(opt);
+      }
+      prioSelect.addEventListener("change", () => {
+        todo.priority = Number(prioSelect.value);
+        saveToLocalStorage();
+        todos.sort(compareTodos);
+        renderTodos();
+      });
+      prioCell.appendChild(prioSelect);
+    } else {
+      const prio = document.createElement("span");
+      prio.className = "priority-title-prio";
+      prio.textContent = `P${todo.priority ?? "-"}`;
+      prioCell.appendChild(prio);
+    }
     const title = document.createElement("span");
     title.className = "priority-title-text";
     title.textContent = todo.title || "(제목 없음)";
     if (todo.done) title.classList.add("done");
-    row.appendChild(prio);
+    row.appendChild(prioCell);
     row.appendChild(title);
     elements.priorityTitlesList.appendChild(row);
   });
@@ -676,7 +730,9 @@ function renderCalendar() {
     const todosContainer = document.createElement("div");
     todosContainer.className = "calendar-todos";
 
-    const dayTodos = todos.filter((t) => t.deadline === dateStr);
+    const dayTodos = todos
+      .filter((t) => t.deadline === dateStr)
+      .sort(compareTodos);
     if (dayTodos.length > 0) {
       cell.classList.add("calendar-cell--has-todo");
     }
@@ -687,7 +743,7 @@ function renderCalendar() {
       const fullTitle = todo.title || "";
       const maxLen = 10;
       const shortTitle = fullTitle.length > maxLen ? `${fullTitle.slice(0, maxLen)}…` : fullTitle;
-      pill.textContent = shortTitle;
+      pill.textContent = `P${todo.priority ?? "-"} ${shortTitle}`;
       pill.title = fullTitle;
       todosContainer.appendChild(pill);
     });
@@ -869,6 +925,9 @@ async function init() {
   elements.unlockBtn.addEventListener("click", handleUnlock);
   elements.lockBtn.addEventListener("click", handleLock);
   elements.filterSelect.addEventListener("change", renderTodos);
+  if (elements.priorityDateInput) {
+    elements.priorityDateInput.addEventListener("change", renderTodos);
+  }
   elements.exportJsonBtn.addEventListener("click", handleExportJson);
   if (elements.resetStorageBtn) {
     elements.resetStorageBtn.addEventListener("click", handleResetStorage);
