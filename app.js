@@ -39,6 +39,8 @@ const elements = {
   calendarNextBtn: document.getElementById("calendar-next-btn"),
   deadlineCalendarBtn: document.getElementById("deadline-calendar-btn"),
   datepickerPopup: document.getElementById("datepicker-popup"),
+  milestonesContainer: document.getElementById("milestones-container"),
+  addMilestoneBtn: document.getElementById("add-milestone-btn"),
 };
 
 let editingId = null;
@@ -68,6 +70,25 @@ function compareTodos(a, b) {
   if (pa !== pb) return pa - pb;
 
   return (a.id || 0) - (b.id || 0);
+}
+
+function sortTodosWithParentFirst(list) {
+  const sorted = [...list].sort(compareTodos);
+  const result = [];
+  const added = new Set();
+  const addWithChildren = (todo) => {
+    if (added.has(todo.id)) return;
+    added.add(todo.id);
+    result.push(todo);
+    getChildTodos(todo).sort(compareTodos).forEach(addWithChildren);
+  };
+  sorted.forEach((t) => {
+    if (!t.parentId) addWithChildren(t);
+  });
+  sorted.forEach((t) => {
+    if (t.parentId && !added.has(t.id)) addWithChildren(t);
+  });
+  return result;
 }
 
 function compareByPriority(a, b) {
@@ -263,6 +284,9 @@ function loadFromLocalStorage() {
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) {
       todos = parsed;
+      if (migrateMilestonesToChildTodos()) {
+        saveToLocalStorage();
+      }
     }
   } catch (e) {
     console.warn("localStorage 불러오기 실패", e);
@@ -299,6 +323,10 @@ function updateLockUI() {
   elements.deadlineInput.disabled = disabled;
   elements.resetFormBtn.disabled = disabled;
   elements.todoForm.querySelector("button[type='submit']").disabled = disabled;
+  if (elements.addMilestoneBtn) elements.addMilestoneBtn.disabled = disabled;
+  elements.milestonesContainer?.querySelectorAll("input, button").forEach((el) => {
+    el.disabled = disabled;
+  });
 
   const actionButtons = document.querySelectorAll(".todo-actions button");
   actionButtons.forEach((btn) => {
@@ -319,9 +347,210 @@ function getTodoDepartment(todo) {
   return DEPARTMENT_LIST.includes(d) ? d : DEPARTMENT_LIST[0];
 }
 
+function getParentTodo(todo) {
+  if (!todo || !todo.parentId) return null;
+  return todos.find((t) => t.id === todo.parentId) || null;
+}
+
+function getChildTodos(todo) {
+  if (!todo || !todo.id) return [];
+  return todos.filter((t) => t.parentId === todo.id);
+}
+
+function getMilestones(todo) {
+  return todo && Array.isArray(todo.milestones) ? todo.milestones : [];
+}
+
+function migrateMilestonesToChildTodos() {
+  const toAdd = [];
+  let changed = false;
+  const maxId = todos.length === 0 ? 0 : Math.max(...todos.map((t) => t.id || 0));
+  let nextId = maxId + 1;
+  todos.forEach((todo) => {
+    const ms = getMilestones(todo);
+    if (ms.length === 0) return;
+    const dept = getTodoDepartment(todo);
+    const prio = Number(todo.priority) || 3;
+    ms.forEach((m) => {
+      if (!m.date || !/^\d{4}-\d{2}-\d{2}$/.test(m.date)) return;
+      toAdd.push({
+        id: nextId++,
+        title: m.label || `${todo.title} - 마일스톤`,
+        deadline: m.date,
+        department: dept,
+        priority: prio,
+        done: false,
+        parentId: todo.id,
+      });
+    });
+    delete todo.milestones;
+    changed = true;
+  });
+  toAdd.forEach((c) => todos.push(c));
+  return changed;
+}
+
+function createMilestoneRow(milestone = { date: "", label: "" }) {
+  const row = document.createElement("div");
+  row.className = "milestone-row";
+  const dateInput = document.createElement("input");
+  dateInput.type = "date";
+  dateInput.className = "milestone-date";
+  dateInput.value = milestone.date || "";
+  const labelInput = document.createElement("input");
+  labelInput.type = "text";
+  labelInput.className = "milestone-label";
+  labelInput.placeholder = "예: 1차 작업";
+  labelInput.value = milestone.label || "";
+  const removeBtn = document.createElement("button");
+  removeBtn.type = "button";
+  removeBtn.className = "secondary milestone-remove-btn";
+  removeBtn.textContent = "삭제";
+  removeBtn.addEventListener("click", () => {
+    row.remove();
+  });
+  row.appendChild(dateInput);
+  row.appendChild(labelInput);
+  row.appendChild(removeBtn);
+  return row;
+}
+
+function renderMilestoneRows(milestones) {
+  if (!elements.milestonesContainer) return;
+  elements.milestonesContainer.innerHTML = "";
+  (milestones || []).forEach((m) => {
+    elements.milestonesContainer.appendChild(createMilestoneRow(m));
+  });
+}
+
+function collectMilestonesFromForm() {
+  if (!elements.milestonesContainer) return [];
+  return collectMilestonesFromContainer(elements.milestonesContainer);
+}
+
+function collectMilestonesFromContainer(container) {
+  if (!container) return [];
+  const rows = container.querySelectorAll(".milestone-row");
+  const result = [];
+  rows.forEach((row) => {
+    const dateInput = row.querySelector(".milestone-date");
+    const labelInput = row.querySelector(".milestone-label");
+    const date = dateInput?.value?.trim();
+    const label = (labelInput?.value ?? "").trim();
+    if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      result.push({ date, label });
+    }
+  });
+  return result;
+}
+
+function openTodoMilestonePopover(todo, triggerEl) {
+  const existing = document.querySelector(".todo-milestone-popover");
+  if (existing) existing.remove();
+
+  const popover = document.createElement("div");
+  popover.className = "todo-milestone-popover";
+
+  const container = document.createElement("div");
+  container.className = "milestone-popover-list";
+  getChildTodos(todo).forEach((child) => {
+    container.appendChild(createMilestoneRow({ date: child.deadline || "", label: child.title || "" }));
+  });
+
+  const addBtn = document.createElement("button");
+  addBtn.type = "button";
+  addBtn.className = "secondary";
+  addBtn.textContent = "마일스톤 추가";
+  addBtn.addEventListener("click", () => {
+    container.appendChild(createMilestoneRow({ date: "", label: "" }));
+  });
+
+  const applyBtn = document.createElement("button");
+  applyBtn.type = "button";
+  applyBtn.textContent = "적용";
+  applyBtn.addEventListener("click", () => {
+    const rows = collectMilestonesFromContainer(container);
+    const children = getChildTodos(todo);
+    rows.forEach((row, i) => {
+      if (children[i]) {
+        children[i].deadline = row.date;
+        children[i].title = row.label || `${todo.title} - 마일스톤`;
+      } else {
+        const newId = todos.length === 0 ? 1 : Math.max(...todos.map((t) => t.id || 0)) + 1;
+        todos.push({
+          id: newId,
+          title: row.label || `${todo.title} - 마일스톤`,
+          deadline: row.date,
+          department: getTodoDepartment(todo),
+          priority: Number(todo.priority) || 3,
+          done: false,
+          parentId: todo.id,
+        });
+      }
+    });
+    if (children.length > rows.length) {
+      children.slice(rows.length).forEach((c) => {
+        todos = todos.filter((t) => t.id !== c.id);
+      });
+    }
+    saveToLocalStorage();
+    document.removeEventListener("click", closeOnOutside);
+    popover.remove();
+    renderTodos();
+  });
+
+  const actions = document.createElement("div");
+  actions.className = "milestone-popover-actions";
+  actions.appendChild(addBtn);
+  actions.appendChild(applyBtn);
+  popover.appendChild(container);
+  popover.appendChild(actions);
+
+  document.body.appendChild(popover);
+  const rect = triggerEl.getBoundingClientRect();
+  popover.style.position = "fixed";
+  popover.style.left = `${Math.min(rect.left, window.innerWidth - 280)}px`;
+  popover.style.top = `${rect.bottom + 4}px`;
+
+  const closeOnOutside = (e) => {
+    if (!popover.contains(e.target) && !triggerEl.contains(e.target)) {
+      const rows = collectMilestonesFromContainer(container);
+      const children = getChildTodos(todo);
+      rows.forEach((row, i) => {
+        if (children[i]) {
+          children[i].deadline = row.date;
+          children[i].title = row.label || `${todo.title} - 마일스톤`;
+        } else {
+          const newId = todos.length === 0 ? 1 : Math.max(...todos.map((t) => t.id || 0)) + 1;
+          todos.push({
+            id: newId,
+            title: row.label || `${todo.title} - 마일스톤`,
+            deadline: row.date,
+            department: getTodoDepartment(todo),
+            priority: Number(todo.priority) || 3,
+            done: false,
+            parentId: todo.id,
+          });
+        }
+      });
+      if (children.length > rows.length) {
+        children.slice(rows.length).forEach((c) => {
+          todos = todos.filter((t) => t.id !== c.id);
+        });
+      }
+      saveToLocalStorage();
+      popover.remove();
+      renderTodos();
+      document.removeEventListener("click", closeOnOutside);
+    }
+  };
+  setTimeout(() => document.addEventListener("click", closeOnOutside), 0);
+}
+
 function createTodoItem(todo) {
   const item = document.createElement("div");
   item.className = "todo-item";
+  if (todo.parentId) item.classList.add("todo-item--milestone");
 
   if (!todo.done) {
     if (isOverdue(todo.deadline)) {
@@ -397,6 +626,43 @@ function createTodoItem(todo) {
     badgeDeadline.textContent = todo.deadline ? `마감일: ${todo.deadline}` : "마감일: -";
   }
   meta.appendChild(badgeDeadline);
+
+  const parentTodo = getParentTodo(todo);
+  if (parentTodo) {
+    const parentBadge = document.createElement("span");
+    parentBadge.className = "badge badge-parent";
+    parentBadge.textContent = `상위: ${parentTodo.title || "(제목 없음)"}`;
+    parentBadge.title = `상위 할 일: ${parentTodo.title || ""}`;
+    meta.appendChild(parentBadge);
+  }
+
+  const childList = getChildTodos(todo);
+  const msWrap = document.createElement("span");
+  msWrap.className = "badge badge-milestone-trigger";
+  if (isUnlocked && !todo.parentId) {
+    const msBtn = document.createElement("button");
+    msBtn.type = "button";
+    msBtn.className = "milestone-add-btn";
+    msBtn.textContent = childList.length > 0 ? `마일스톤(${childList.length})` : "마일스톤 추가";
+    msBtn.title = "마일스톤 추가/편집";
+    msBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openTodoMilestonePopover(todo, msBtn);
+    });
+    msWrap.appendChild(msBtn);
+  } else if (!todo.parentId && childList.length > 0) {
+    const parts = childList.map((c) => {
+      const d = (c.deadline || "").replace(/^(\d{4})-(\d{2})-(\d{2})$/, "$2/$3");
+      return c.title ? `${d} ${c.title}` : d;
+    });
+    msWrap.textContent = `마일스톤: ${parts.join(", ")}`;
+    msWrap.title = childList.map((c) => `${c.deadline} ${c.title || ""}`.trim()).join("\n");
+    msWrap.classList.add("badge-milestones");
+  } else if (!todo.parentId) {
+    msWrap.textContent = "마일스톤";
+    msWrap.classList.add("badge-milestones-empty");
+  }
+  if (!todo.parentId) meta.appendChild(msWrap);
 
   const prioContainer = document.createElement("span");
   prioContainer.className = "badge badge-priority";
@@ -504,7 +770,8 @@ function createTodoItem(todo) {
     if (!isUnlocked) return;
     const ok = confirm("정말로 이 할 일을 삭제하시겠습니까?");
     if (!ok) return;
-    todos = todos.filter((t) => t.id !== todo.id);
+    const toRemove = new Set([todo.id, ...getChildTodos(todo).map((c) => c.id)]);
+    todos = todos.filter((t) => !toRemove.has(t.id));
     saveToLocalStorage();
     renderTodos();
   });
@@ -545,7 +812,7 @@ function renderTodos() {
 
   DEPARTMENT_LIST.forEach((dept) => {
     const deptTodos = todos.filter((t) => getTodoDepartment(t) === dept && !t.done);
-    const filtered = applyFilter([...deptTodos].sort(compareTodos));
+    const filtered = applyFilter(sortTodosWithParentFirst(deptTodos));
 
     const block = document.createElement("div");
     block.className = "department-block";
@@ -573,7 +840,7 @@ function renderTodos() {
     elements.todoListEmpty.style.display = "none";
   }
 
-  const completedTodos = todos.filter((t) => t.done).sort(compareTodos);
+  const completedTodos = sortTodosWithParentFirst(todos.filter((t) => t.done));
   if (elements.completedSection) {
     elements.completedSection.style.display = filter === "pending" ? "none" : "";
   }
@@ -730,21 +997,29 @@ function renderCalendar() {
     const todosContainer = document.createElement("div");
     todosContainer.className = "calendar-todos";
 
-    const dayTodos = todos
-      .filter((t) => t.deadline === dateStr)
-      .sort(compareTodos);
+    const dayTodos = [];
+    todos.forEach((t) => {
+      if (t.deadline === dateStr) {
+        const type = t.parentId ? "milestone" : "deadline";
+        dayTodos.push({ todo: t, type });
+      }
+    });
+    dayTodos.sort((a, b) => compareTodos(a.todo, b.todo));
     if (dayTodos.length > 0) {
       cell.classList.add("calendar-cell--has-todo");
     }
 
-    dayTodos.forEach((todo) => {
+    dayTodos.forEach(({ todo, type }) => {
       const pill = document.createElement("div");
       pill.className = "calendar-todo-pill";
+      if (todo.done) pill.classList.add("calendar-todo-pill--done");
+      if (type === "milestone") pill.classList.add("calendar-todo-pill--milestone");
       const fullTitle = todo.title || "";
       const maxLen = 10;
       const shortTitle = fullTitle.length > maxLen ? `${fullTitle.slice(0, maxLen)}…` : fullTitle;
-      pill.textContent = `P${todo.priority ?? "-"} ${shortTitle}`;
-      pill.title = fullTitle;
+      const prefix = type === "milestone" ? "M " : `P${todo.priority ?? "-"} `;
+      pill.textContent = prefix + shortTitle;
+      pill.title = type === "milestone" ? `마일스톤: ${fullTitle}` : fullTitle;
       todosContainer.appendChild(pill);
     });
 
@@ -760,6 +1035,7 @@ function resetForm() {
   if (elements.departmentSelect) {
     elements.departmentSelect.value = "";
   }
+  renderMilestoneRows([]);
   const submitBtn = elements.todoForm.querySelector("button[type='submit']");
   submitBtn.textContent = "추가";
 }
@@ -773,6 +1049,13 @@ function startEdit(id) {
   if (elements.departmentSelect) {
     const dept = getTodoDepartment(todo);
     elements.departmentSelect.value = dept;
+  }
+  if (!todo.parentId) {
+    renderMilestoneRows(
+      getChildTodos(todo).map((c) => ({ date: c.deadline || "", label: c.title || "" }))
+    );
+  } else {
+    renderMilestoneRows([]);
   }
   const submitBtn = elements.todoForm.querySelector("button[type='submit']");
   submitBtn.textContent = "수정 저장";
@@ -803,6 +1086,7 @@ function handleSubmit(e) {
     return;
   }
   const deadlineStr = formatYmd(deadlineParsed.getFullYear(), deadlineParsed.getMonth(), deadlineParsed.getDate());
+  const milestoneRows = collectMilestonesFromForm();
 
   if (editingId != null) {
     const todo = todos.find((t) => t.id === editingId);
@@ -812,6 +1096,29 @@ function handleSubmit(e) {
       todo.department = department;
       if (!Number.isFinite(Number(todo.priority))) {
         todo.priority = defaultPriority;
+      }
+      const children = getChildTodos(todo);
+      milestoneRows.forEach((row, i) => {
+        if (children[i]) {
+          children[i].deadline = row.date;
+          children[i].title = row.label || `${todo.title} - 마일스톤`;
+        } else {
+          const newId = todos.length === 0 ? 1 : Math.max(...todos.map((t) => t.id || 0)) + 1;
+          todos.push({
+            id: newId,
+            title: row.label || `${todo.title} - 마일스톤`,
+            deadline: row.date,
+            department,
+            priority: Number(todo.priority) || defaultPriority,
+            done: false,
+            parentId: todo.id,
+          });
+        }
+      });
+      if (children.length > milestoneRows.length) {
+        children.slice(milestoneRows.length).forEach((c) => {
+          todos = todos.filter((t) => t.id !== c.id);
+        });
       }
     }
   } else {
@@ -823,6 +1130,18 @@ function handleSubmit(e) {
       department,
       priority: defaultPriority,
       done: false,
+    });
+    milestoneRows.forEach((row) => {
+      const childId = Math.max(...todos.map((t) => t.id || 0)) + 1;
+      todos.push({
+        id: childId,
+        title: row.label || `${title} - 마일스톤`,
+        deadline: row.date,
+        department,
+        priority: defaultPriority,
+        done: false,
+        parentId: newId,
+      });
     });
   }
 
@@ -914,6 +1233,9 @@ async function init() {
   if (todos.length === 0) {
     await loadFromFile();
   }
+  if (elements.priorityDateInput) {
+    elements.priorityDateInput.value = getTodayString();
+  }
   renderTodos();
 
   elements.todoForm.addEventListener("submit", handleSubmit);
@@ -922,6 +1244,15 @@ async function init() {
     if (!isUnlocked) return;
     resetForm();
   });
+  if (elements.addMilestoneBtn) {
+    elements.addMilestoneBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      if (!isUnlocked) return;
+      if (elements.milestonesContainer) {
+        elements.milestonesContainer.appendChild(createMilestoneRow({ date: "", label: "" }));
+      }
+    });
+  }
   elements.unlockBtn.addEventListener("click", handleUnlock);
   elements.lockBtn.addEventListener("click", handleLock);
   elements.filterSelect.addEventListener("change", renderTodos);
