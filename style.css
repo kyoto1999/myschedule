@@ -118,6 +118,12 @@ body {
   color: var(--accent);
 }
 
+.lock-hint {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
 .app-main {
   display: flex;
   flex-direction: column;

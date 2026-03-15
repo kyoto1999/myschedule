@@ -14,6 +14,7 @@ const elements = {
   unlockBtn: document.getElementById("unlock-btn"),
   lockBtn: document.getElementById("lock-btn"),
   lockStatus: document.getElementById("lock-status"),
+  lockHint: document.querySelector(".lock-hint"),
 
   todoForm: document.getElementById("todo-form"),
   titleInput: document.getElementById("title-input"),
@@ -342,10 +343,12 @@ function updateLockUI() {
     elements.lockStatus.textContent = "현재 상태: 잠금 해제됨";
     elements.lockStatus.classList.remove("lock-status--locked");
     elements.lockStatus.classList.add("lock-status--unlocked");
+    if (elements.lockHint) elements.lockHint.textContent = "편집 가능합니다.";
   } else {
     elements.lockStatus.textContent = "현재 상태: 잠김";
     elements.lockStatus.classList.remove("lock-status--unlocked");
     elements.lockStatus.classList.add("lock-status--locked");
+    if (elements.lockHint) elements.lockHint.textContent = "요청 부서별 할 일을 수정·삭제하려면 잠금 해제가 필요합니다.";
   }
 
   const disabled = !isUnlocked;
@@ -807,7 +810,10 @@ function createTodoItem(todo) {
   editBtn.textContent = "수정";
   editBtn.className = "edit-btn";
   editBtn.addEventListener("click", () => {
-    if (!isUnlocked) return;
+    if (!isUnlocked) {
+      alert("편집하려면 먼저 상단에서 '잠금 해제' 후 비밀번호를 입력해 주세요.");
+      return;
+    }
     startEdit(todo.id);
   });
 
@@ -816,7 +822,10 @@ function createTodoItem(todo) {
   deleteBtn.textContent = "삭제";
   deleteBtn.className = "delete-btn";
   deleteBtn.addEventListener("click", () => {
-    if (!isUnlocked) return;
+    if (!isUnlocked) {
+      alert("삭제하려면 먼저 상단에서 '잠금 해제' 후 비밀번호를 입력해 주세요.");
+      return;
+    }
     const ok = confirm("정말로 이 할 일을 삭제하시겠습니까?");
     if (!ok) return;
     const toRemove = new Set([todo.id, ...getChildTodos(todo).map((c) => c.id)]);
