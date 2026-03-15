@@ -46,6 +46,9 @@ const elements = {
 let editingId = null;
 let datepickerYear;
 let datepickerMonth;
+let datepickerOnSelect = null;
+let datepickerSelectedValue = "";
+let datepickerExcludeEls = [];
 
 function safeParseDate(value) {
   if (!value) return null;
@@ -150,8 +153,19 @@ function parseYmd(value) {
 }
 
 function openDatepicker() {
-  const inputVal = elements.deadlineInput.value.trim();
-  const parsed = parseYmd(inputVal);
+  openDatepickerFor(
+    [elements.deadlineInput, elements.deadlineCalendarBtn].filter(Boolean),
+    elements.deadlineInput?.value?.trim() || "",
+    (dateStr) => {
+      if (elements.deadlineInput) elements.deadlineInput.value = dateStr;
+    }
+  );
+}
+
+function openDatepickerFor(triggerOrExcludes, currentValue, onSelect) {
+  const exclList = Array.isArray(triggerOrExcludes) ? triggerOrExcludes : [triggerOrExcludes];
+  const triggerEl = exclList[0];
+  const parsed = parseYmd(currentValue);
   const today = new Date();
   if (parsed) {
     datepickerYear = parsed.getFullYear();
@@ -160,14 +174,27 @@ function openDatepicker() {
     datepickerYear = today.getFullYear();
     datepickerMonth = today.getMonth();
   }
+  datepickerOnSelect = onSelect;
+  datepickerSelectedValue = currentValue;
+  datepickerExcludeEls = exclList;
   renderDatepicker();
   if (elements.datepickerPopup) {
+    if (triggerEl && document.body.contains(triggerEl)) {
+      document.body.appendChild(elements.datepickerPopup);
+      const rect = triggerEl.getBoundingClientRect();
+      elements.datepickerPopup.style.position = "fixed";
+      elements.datepickerPopup.style.left = `${Math.min(rect.left, window.innerWidth - 260)}px`;
+      elements.datepickerPopup.style.top = `${rect.bottom + 4}px`;
+    }
     elements.datepickerPopup.classList.add("is-open");
     elements.datepickerPopup.setAttribute("aria-hidden", "false");
   }
 }
 
 function closeDatepicker() {
+  datepickerOnSelect = null;
+  datepickerSelectedValue = "";
+  datepickerExcludeEls = [];
   if (elements.datepickerPopup) {
     elements.datepickerPopup.classList.remove("is-open");
     elements.datepickerPopup.setAttribute("aria-hidden", "true");
@@ -183,7 +210,7 @@ function renderDatepicker() {
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const daysInPrevMonth = new Date(year, month, 0).getDate();
   const todayStr = getTodayString();
-  const selectedStr = elements.deadlineInput.value.trim();
+  const selectedStr = datepickerOnSelect ? datepickerSelectedValue.trim() : (elements.deadlineInput?.value?.trim() || "");
   const selectedValid = parseYmd(selectedStr);
 
   let html = "";
@@ -236,7 +263,11 @@ function renderDatepicker() {
     btn.addEventListener("click", () => {
       const dateStr = btn.getAttribute("data-date");
       if (dateStr) {
-        elements.deadlineInput.value = dateStr;
+        if (datepickerOnSelect) {
+          datepickerOnSelect(dateStr);
+        } else if (elements.deadlineInput) {
+          elements.deadlineInput.value = dateStr;
+        }
         closeDatepicker();
       }
     });
@@ -610,6 +641,8 @@ function createTodoItem(todo) {
   if (isUnlocked) {
     const deadlineLabel = document.createElement("span");
     deadlineLabel.textContent = "마감일: ";
+    const wrap = document.createElement("div");
+    wrap.className = "deadline-picker-wrap";
     const deadlineInput = document.createElement("input");
     deadlineInput.type = "date";
     deadlineInput.className = "todo-deadline-input";
@@ -620,8 +653,24 @@ function createTodoItem(todo) {
       saveToLocalStorage();
       renderTodos();
     });
+    const calBtn = document.createElement("button");
+    calBtn.type = "button";
+    calBtn.className = "calendar-trigger-btn";
+    calBtn.title = "달력에서 선택";
+    calBtn.textContent = "📅";
+    calBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      openDatepickerFor([calBtn, deadlineInput], todo.deadline || "", (dateStr) => {
+        todo.deadline = dateStr;
+        deadlineInput.value = dateStr;
+        saveToLocalStorage();
+        renderTodos();
+      });
+    });
+    wrap.appendChild(deadlineInput);
+    wrap.appendChild(calBtn);
     badgeDeadline.appendChild(deadlineLabel);
-    badgeDeadline.appendChild(deadlineInput);
+    badgeDeadline.appendChild(wrap);
   } else {
     badgeDeadline.textContent = todo.deadline ? `마감일: ${todo.deadline}` : "마감일: -";
   }
@@ -1279,8 +1328,7 @@ async function init() {
       elements.datepickerPopup &&
       elements.datepickerPopup.classList.contains("is-open") &&
       !elements.datepickerPopup.contains(e.target) &&
-      !elements.deadlineInput?.contains(e.target) &&
-      !elements.deadlineCalendarBtn?.contains(e.target)
+      !datepickerExcludeEls.some((el) => el && el.contains(e.target))
     ) {
       closeDatepicker();
     }

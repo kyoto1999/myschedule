@@ -756,6 +756,20 @@ button:disabled {
   outline: none;
 }
 
+.badge-deadline .deadline-picker-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.badge-deadline .calendar-trigger-btn {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
 .badge-priority {
   border-color: var(--accent);
   background: var(--accent-soft);
